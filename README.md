@@ -304,4 +304,4 @@ MIT — see `LICENSE` for details.
 
 ## Author
 
-Emanuele Montenegro
+Emanuele Pio De Bernardis
