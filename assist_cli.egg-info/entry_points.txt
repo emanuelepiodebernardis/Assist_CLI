@@ -1,0 +1,2 @@
+[console_scripts]
+assist = assist.cli.main:app

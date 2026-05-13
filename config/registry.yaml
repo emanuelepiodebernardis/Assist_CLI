@@ -1,0 +1,24 @@
+tasks:
+  generate:
+    agent: GeneratorAgent
+    skills:
+      - project_rules
+      - python_generation
+
+  review:
+    agent: ReviewerAgent
+    skills:
+      - project_rules
+      - code_review
+
+  refactor:
+    agent: RefactorAgent
+    skills:
+      - project_rules
+      - refactor
+
+  explain:
+    agent: ExplainerAgent
+    skills:
+      - project_rules
+      - documentation
