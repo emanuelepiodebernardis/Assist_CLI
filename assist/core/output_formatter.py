@@ -18,6 +18,7 @@ CODE_BLOCK_PATTERN = re.compile(
 
 PURE_CODE_TASKS: set[str] = {
     "generate",
+    "test",
 }
 
 
@@ -29,6 +30,7 @@ MIXED_CODE_TASKS: set[str] = {
 PROSE_TASKS: set[str] = {
     "review",
     "explain",
+    "diff",
 }
 
 
@@ -159,6 +161,8 @@ class OutputFormatter:
             "refactor": "Refactor",
             "generate": "Generated Code",
             "explain": "Explanation",
+            "test": "Generated Tests",
+            "diff": "Diff Review",
         }
 
         return titles.get(

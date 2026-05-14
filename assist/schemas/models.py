@@ -21,10 +21,11 @@ class Skill(BaseModel):
 
 class TaskInput(BaseModel):
     command: str
-    file_path: str
+    file_path: str | None = None
     language: str = "python"
     raw_input: str | None = None
     options: dict = Field(default_factory=dict)
+    git_range: str | None = None 
 
 
 class ValidationReport(BaseModel):
@@ -205,3 +206,40 @@ class FinalOutput(BaseModel):
     task_type: str
     quality_score: float = Field(ge=0.0, le=1.0)
     iterations_used: int = Field(ge=1, default=1)
+
+class FileDiff(BaseModel):
+    """Diff di un singolo file modificato dal range git.
+
+    Rappresenta cosa e' cambiato in un file specifico:
+    quante righe aggiunte/rimosse e l'output testuale del diff
+    per quel file (sezione "hunks").
+    """
+
+    path: str
+
+    additions: int = 0
+
+    deletions: int = 0
+
+    hunks: str = ""
+
+
+class GitDiff(BaseModel):
+    """Risultato dell'estrazione di un diff git su un range.
+
+    Aggrega tutti i FileDiff prodotti dal range specificato,
+    piu' metadati aggregati (summary) e l'output raw di git diff
+    (utile per il prompt completo da inviare all'LLM).
+    """
+
+    range_spec: str
+
+    files: list[FileDiff] = []
+
+    files_changed: int = 0
+
+    total_additions: int = 0
+
+    total_deletions: int = 0
+
+    raw_diff: str = ""

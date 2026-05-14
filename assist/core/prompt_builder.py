@@ -75,6 +75,44 @@ class PromptBuilder:
         )
 
     @staticmethod
+    def _build_validation_json_schema() -> str:
+
+        return """
+# FORMATO DI OUTPUT
+
+Restituisci SOLO un JSON valido con questa struttura.
+
+VINCOLI OBBLIGATORI:
+- "severity" DEVE essere esattamente una di queste 4 stringhe:
+  "critical", "high", "medium", "low"
+  Non sono ammessi altri valori (no "minor", "info", "warning",
+  "trivial", "blocker", ecc.).
+- "is_valid" deve essere true o false (boolean, non stringa).
+- "quality_score" e "clarity_score" devono essere numeri tra 0.0 e 1.0.
+- "location" puo essere null oppure una stringa.
+
+STRUTTURA:
+
+{
+  "is_valid": true,
+  "quality_score": 0.0,
+  "clarity_score": 0.0,
+  "issues": [
+    {
+      "severity": "critical",
+      "message": "string",
+      "location": "string or null"
+    }
+  ],
+  "actions": [
+    "string"
+  ]
+}
+
+Non aggiungere testo fuori dal JSON.
+""".strip()
+
+    @staticmethod
     def build_review_prompt(
         task: TaskInput,
         skills: list[Skill],
@@ -142,6 +180,11 @@ Non aggiungere prefazioni.
             ._build_context_block(task)
         )
 
+        validation_schema = (
+            PromptBuilder
+            ._build_validation_json_schema()
+        )
+
         return f"""{skills_block}
 
 # CONTESTO STRUTTURALE DEL PROGETTO
@@ -168,38 +211,7 @@ Valuta:
 - presenza di fix concreti
 - coerenza con il contesto strutturale
 
-# FORMATO DI OUTPUT
-
-Restituisci SOLO un JSON valido con questa struttura.
-
-VINCOLI OBBLIGATORI:
-- "severity" DEVE essere esattamente una di queste 4 stringhe:
-  "critical", "high", "medium", "low"
-  Non sono ammessi altri valori (no "minor", "info", "warning",
-  "trivial", "blocker", ecc.).
-- "is_valid" deve essere true o false (boolean, non stringa).
-- "quality_score" e "clarity_score" devono essere numeri tra 0.0 e 1.0.
-- "location" puo essere null oppure una stringa.
-
-STRUTTURA:
-
-{{
-  "is_valid": true,
-  "quality_score": 0.0,
-  "clarity_score": 0.0,
-  "issues": [
-    {{
-      "severity": "critical",
-      "message": "string",
-      "location": "string or null"
-    }}
-  ],
-  "actions": [
-    "string"
-  ]
-}}
-
-Non aggiungere testo fuori dal JSON.
+{validation_schema}
 """.strip()
 
     @staticmethod
@@ -333,6 +345,11 @@ il contenuto completo del file.
             or "python"
         )
 
+        validation_schema = (
+            PromptBuilder
+            ._build_validation_json_schema()
+        )
+
         return f"""{skills_block}
 
 # CONTESTO STRUTTURALE DEL PROGETTO
@@ -357,38 +374,7 @@ Verifica in particolare:
 - assenza di placeholder (TODO, FIXME, pass non intenzionale)
 - coerenza con il contesto del progetto
 
-# FORMATO DI OUTPUT
-
-Restituisci SOLO un JSON valido con questa struttura.
-
-VINCOLI OBBLIGATORI:
-- "severity" DEVE essere esattamente una di queste 4 stringhe:
-  "critical", "high", "medium", "low"
-  Non sono ammessi altri valori (no "minor", "info", "warning",
-  "trivial", "blocker", ecc.).
-- "is_valid" deve essere true o false (boolean, non stringa).
-- "quality_score" e "clarity_score" devono essere numeri tra 0.0 e 1.0.
-- "location" puo essere null oppure una stringa.
-
-STRUTTURA:
-
-{{
-  "is_valid": true,
-  "quality_score": 0.0,
-  "clarity_score": 0.0,
-  "issues": [
-    {{
-      "severity": "critical",
-      "message": "string",
-      "location": "string or null"
-    }}
-  ],
-  "actions": [
-    "string"
-  ]
-}}
-
-Non aggiungere testo fuori dal JSON.
+{validation_schema}
 """.strip()
 
     @staticmethod
@@ -536,6 +522,11 @@ Non aggiungere prefazioni.
             or "python"
         )
 
+        validation_schema = (
+            PromptBuilder
+            ._build_validation_json_schema()
+        )
+
         return f"""{skills_block}
 
 # CONTESTO STRUTTURALE DEL PROGETTO
@@ -572,38 +563,7 @@ Verifica in particolare:
 - SINTASSI: il codice nel blocco "## Codice refactorizzato" e' {language}
   sintatticamente valido?
 
-# FORMATO DI OUTPUT
-
-Restituisci SOLO un JSON valido con questa struttura.
-
-VINCOLI OBBLIGATORI:
-- "severity" DEVE essere esattamente una di queste 4 stringhe:
-  "critical", "high", "medium", "low"
-  Non sono ammessi altri valori (no "minor", "info", "warning",
-  "trivial", "blocker", ecc.).
-- "is_valid" deve essere true o false (boolean, non stringa).
-- "quality_score" e "clarity_score" devono essere numeri tra 0.0 e 1.0.
-- "location" puo essere null oppure una stringa.
-
-STRUTTURA:
-
-{{
-  "is_valid": true,
-  "quality_score": 0.0,
-  "clarity_score": 0.0,
-  "issues": [
-    {{
-      "severity": "critical",
-      "message": "string",
-      "location": "string or null"
-    }}
-  ],
-  "actions": [
-    "string"
-  ]
-}}
-
-Non aggiungere testo fuori dal JSON.
+{validation_schema}
 """.strip()
 
     @staticmethod
@@ -758,6 +718,11 @@ Non aggiungere prefazioni.
             ._build_context_block(task)
         )
 
+        validation_schema = (
+            PromptBuilder
+            ._build_validation_json_schema()
+        )
+
         return f"""{skills_block}
 
 # CONTESTO STRUTTURALE DEL PROGETTO
@@ -784,38 +749,7 @@ Valuta in particolare:
 - assenza di prefazioni o postfazioni
 - assenza di ripetizione del codice senza valore aggiunto
 
-# FORMATO DI OUTPUT
-
-Restituisci SOLO un JSON valido con questa struttura.
-
-VINCOLI OBBLIGATORI:
-- "severity" DEVE essere esattamente una di queste 4 stringhe:
-  "critical", "high", "medium", "low"
-  Non sono ammessi altri valori (no "minor", "info", "warning",
-  "trivial", "blocker", ecc.).
-- "is_valid" deve essere true o false (boolean, non stringa).
-- "quality_score" e "clarity_score" devono essere numeri tra 0.0 e 1.0.
-- "location" puo essere null oppure una stringa.
-
-STRUTTURA:
-
-{{
-  "is_valid": true,
-  "quality_score": 0.0,
-  "clarity_score": 0.0,
-  "issues": [
-    {{
-      "severity": "critical",
-      "message": "string",
-      "location": "string or null"
-    }}
-  ],
-  "actions": [
-    "string"
-  ]
-}}
-
-Non aggiungere testo fuori dal JSON.
+{validation_schema}
 """.strip()
 
     @staticmethod
@@ -871,4 +805,491 @@ La spiegazione finale deve:
 - mantenere le parti del draft che il report non ha segnalato
 
 Restituisci SOLO la spiegazione finale corretta.
+""".strip()
+
+    @staticmethod
+    def build_test_prompt(
+        task: TaskInput,
+        skills: list[Skill],
+    ) -> str:
+
+        if not task.raw_input:
+            raise ValueError(
+                "TaskInput.raw_input is empty. "
+                "File content must be injected "
+                "before prompt building."
+            )
+
+        skills_block = (
+            PromptBuilder
+            ._build_skills_block(skills)
+        )
+
+        rendered_context = (
+            PromptBuilder
+            ._build_context_block(task)
+        )
+
+        language = (
+            task.language
+            or "python"
+        )
+
+        return f"""{skills_block}
+
+# CONTESTO STRUTTURALE DEL PROGETTO
+
+Le seguenti informazioni provengono da un'analisi statica
+deterministica della codebase. Usale per ancorare la generazione
+dei test a fatti reali rilevati nel progetto.
+
+Le funzioni e classi rilevate nel semantic_context
+rappresentano il comportamento osservabile del file.
+
+Usale per determinare:
+- cosa testare
+- quali edge case sono rilevanti
+- quali funzioni sono pubbliche o critiche
+- quali branch logici richiedono copertura dedicata
+
+{rendered_context}
+
+# CODICE DA TESTARE
+
+```{language}
+{task.raw_input}
+```
+
+# GENERA ORA I TEST PYTEST
+
+Applica rigorosamente le regole definite nelle skill sopra.
+
+VINCOLI ASSOLUTI:
+- NON inventare comportamento non presente nel codice
+- NON correggere bug del codice originale
+- se trovi un bug, preserva il comportamento osservato
+  e documentalo con commento "# BUG:"
+- genera test ancorati al comportamento osservabile
+- privilegia test significativi rispetto a test ridondanti
+
+# VINCOLI DI OUTPUT
+
+REGOLE OBBLIGATORIE:
+- restituisci SOLO codice pytest valido
+- non usare markdown fences
+- non aggiungere spiegazioni
+- non aggiungere prefazioni
+- non aggiungere testo fuori dal codice
+- il risultato deve essere pronto per essere salvato
+  come file test_<module>.py ed eseguito direttamente
+
+Il file finale deve contenere:
+- import validi
+- fixture necessarie
+- test pytest validi
+- struttura Arrange-Act-Assert
+- naming descrittivo dei test
+""".strip()
+
+    @staticmethod
+    def build_test_self_check_prompt(
+        draft: str,
+        task: TaskInput,
+        skills: list[Skill],
+    ) -> str:
+
+        skills_block = (
+            PromptBuilder
+            ._build_skills_block(skills)
+        )
+
+        rendered_context = (
+            PromptBuilder
+            ._build_context_block(task)
+        )
+
+        language = (
+            task.language
+            or "python"
+        )
+
+        validation_schema = (
+            PromptBuilder
+            ._build_validation_json_schema()
+        )
+
+        return f"""{skills_block}
+
+# CONTESTO STRUTTURALE DEL PROGETTO
+
+{rendered_context}
+
+# CODICE ORIGINALE
+
+```{language}
+{task.raw_input}
+```
+
+# TEST PYTEST DA VALIDARE
+
+```{language}
+{draft}
+```
+
+# VALIDAZIONE
+
+Sei il reviewer finale della test suite.
+
+Il tuo default e' BLOCCARE.
+
+Cerca attivamente:
+- test non deterministici
+- copertura insufficiente
+- edge case mancanti
+- assert deboli o banali
+- dipendenze tra test
+- uso scorretto di fixture
+- mocking inutile
+- violazioni delle skill
+- dettagli implementativi testati al posto
+  del comportamento osservabile
+
+Verifica in particolare:
+- sintassi pytest valida
+- pytest --collect-only passerebbe?
+- ogni funzione pubblica ha almeno un happy path?
+- gli edge case richiesti sono presenti?
+- i test sono indipendenti?
+- il protocollo BUG e' rispettato?
+- naming e struttura AAA sono corretti?
+- i test riflettono il comportamento reale del codice?
+
+{validation_schema}
+""".strip()
+
+    @staticmethod
+    def build_test_correction_prompt(
+        draft: str,
+        report: ValidationReport,
+        task: TaskInput,
+        skills: list[Skill],
+    ) -> str:
+
+        skills_block = (
+            PromptBuilder
+            ._build_skills_block(skills)
+        )
+
+        rendered_context = (
+            PromptBuilder
+            ._build_context_block(task)
+        )
+
+        report_json = (
+            report.model_dump_json(indent=2)
+        )
+
+        language = (
+            task.language
+            or "python"
+        )
+
+        return f"""{skills_block}
+
+# CONTESTO STRUTTURALE DEL PROGETTO
+
+{rendered_context}
+
+# CODICE ORIGINALE
+
+```{language}
+{task.raw_input}
+```
+
+# TEST DA CORREGGERE
+
+```{language}
+{draft}
+```
+
+# VALIDATION REPORT
+
+{report_json}
+
+# CORREZIONE
+
+Correggi la test suite usando il validation report.
+
+REGOLE OBBLIGATORIE:
+- mantieni i test validi gia presenti
+- correggi SOLO i problemi segnalati
+- preserva il comportamento osservabile del codice originale
+- NON correggere silenziosamente bug del codice originale
+- se esiste un bug, documentalo con commento "# BUG:"
+- mantieni naming descrittivo e struttura AAA
+- restituisci SOLO codice pytest valido
+- non usare markdown fences nell'output finale
+- non aggiungere spiegazioni
+- non aggiungere testo fuori dal codice
+- il risultato deve essere sintatticamente valido
+- mantieni le parti del draft che il report non ha segnalato
+""".strip()
+    
+    # =====================================================================
+# Tre metodi da aggiungere a PromptBuilder in assist/core/prompt_builder.py
+#
+# Vanno aggiunti dopo build_test_correction_prompt, prima della chiusura
+# della classe PromptBuilder.
+#
+# Pattern: copia esatta della struttura di build_refactor_*, con queste
+# differenze chiave:
+# - usa task.options["impacted_files_content"] per il contenuto dei file
+# - usa task.raw_input come raw_diff (non come codice di un singolo file)
+# - usa task.options.get("range_spec") per riportare il range richiesto
+# =====================================================================
+
+
+    @staticmethod
+    def _build_impacted_files_block(
+        task: TaskInput,
+    ) -> str:
+        """Costruisce la sezione FILE IMPATTATI con il contenuto
+        di ogni file toccato dal diff.
+
+        task.options["impacted_files_content"] e' un dict {path: content}
+        popolato dall'orchestrator usando GitDiffExtractor + ProjectGraph.
+        """
+
+        impacted_files = (
+            task.options.get(
+                "impacted_files_content",
+                {},
+            )
+        )
+
+        if not impacted_files:
+            return "(nessun file impattato disponibile)"
+
+        sections = []
+
+        for path, content in impacted_files.items():
+
+            sections.append(
+                f"## File: {path}\n\n"
+                f"```python\n"
+                f"{content}\n"
+                f"```"
+            )
+
+        return "\n\n".join(sections)
+
+    @staticmethod
+    def build_diff_prompt(
+        task: TaskInput,
+        skills: list[Skill],
+    ) -> str:
+
+        if not task.raw_input:
+            raise ValueError(
+                "TaskInput.raw_input is empty. "
+                "Git diff content must be injected "
+                "before prompt building."
+            )
+
+        skills_block = (
+            PromptBuilder
+            ._build_skills_block(skills)
+        )
+
+        rendered_context = (
+            PromptBuilder
+            ._build_context_block(task)
+        )
+
+        impacted_files_block = (
+            PromptBuilder
+            ._build_impacted_files_block(task)
+        )
+
+        range_spec = (
+            task.options.get(
+                "range_spec",
+                "HEAD",
+            )
+        )
+
+        return f"""{skills_block}
+
+# CONTESTO STRUTTURALE DEL PROGETTO
+
+Le seguenti informazioni provengono da un'analisi statica
+deterministica della codebase. Usale per inquadrare il diff
+nel contesto reale del progetto.
+
+{rendered_context}
+
+# FILE IMPATTATI
+
+I file seguenti sono quelli toccati dal diff o che dipendono
+da simboli modificati. Il contenuto e' la versione CORRENTE
+del file (post-modifica), non quella precedente.
+
+{impacted_files_block}
+
+# DIFF DA ANALIZZARE
+
+Range git: {range_spec}
+
+```diff
+{task.raw_input}
+```
+
+# ESEGUI ORA LA REVIEW DEL DIFF
+
+Applica rigorosamente le regole definite nella skill diff_review.
+
+VINCOLI ASSOLUTI:
+- Focus sui CAMBIAMENTI, non sui file completi
+- Non commentare codice non modificato dal diff
+- Non commentare codice cancellato come fosse problematico
+  (la cancellazione e' una scelta intenzionale del committente)
+- Identifica breaking change solo su simboli che hai motivo
+  di considerare pubblici (vedi sezione 3 della skill)
+- Severity calibrata: usa critical solo per impatto immediato
+- Sezioni "## Rischi" e "## Suggerimenti" SOLO se hanno
+  contenuto reale (non sezioni vuote con "Nessun problema rilevato")
+
+Produci l'output nel formato esatto definito dalla skill diff_review:
+- "## Sommario" sempre
+- "## Modifiche rilevanti" sempre
+- "## Rischi" se ci sono rischi
+- "## Suggerimenti" se ci sono suggerimenti
+
+Non aggiungere prefazioni.
+""".strip()
+
+    @staticmethod
+    def build_diff_self_check_prompt(
+        draft: str,
+        task: TaskInput,
+        skills: list[Skill],
+    ) -> str:
+
+        skills_block = (
+            PromptBuilder
+            ._build_skills_block(skills)
+        )
+
+        rendered_context = (
+            PromptBuilder
+            ._build_context_block(task)
+        )
+
+        validation_schema = (
+            PromptBuilder
+            ._build_validation_json_schema()
+        )
+
+        return f"""{skills_block}
+
+# CONTESTO STRUTTURALE DEL PROGETTO
+
+{rendered_context}
+
+# DIFF ORIGINALE
+
+```diff
+{task.raw_input}
+```
+
+# REVIEW DEL DIFF DA VALIDARE
+
+{draft}
+
+# VALIDAZIONE
+
+Sei il reviewer finale della review del diff.
+
+Il tuo default e' BLOCCARE. Cerca attivamente motivi
+per non approvare.
+
+Verifica in particolare:
+- FOCUS SUL DIFF: la review parla dei cambiamenti del diff,
+  non del codice non modificato?
+- CONCRETEZZA: ogni rischio cita file e righe specifiche?
+  Ogni suggerimento e' applicabile al diff stesso?
+- CALIBRAZIONE SEVERITY: i severity sono giustificati dall'impatto
+  reale, non gonfiati? Non c'e' un critical per un piccolo refactor?
+- ANCORAGGIO "PUBBLICO": i breaking change citano il dato del
+  context che giustifica la qualifica di "pubblico"?
+- SEZIONI CONDIZIONALI: "## Rischi" e "## Suggerimenti" sono
+  presenti SOLO se hanno contenuto reale? Non vuote con disclaimer?
+- ASSENZA DI FILLER: niente "Nessun rischio rilevato",
+  "Codice ben scritto", "Continuate cosi'"?
+- TRATTAMENTO DEL CODICE CANCELLATO: non e' stato commentato
+  come problematico, eccetto per breaking change documentati?
+
+{validation_schema}
+""".strip()
+
+    @staticmethod
+    def build_diff_correction_prompt(
+        draft: str,
+        report: ValidationReport,
+        task: TaskInput,
+        skills: list[Skill],
+    ) -> str:
+
+        skills_block = (
+            PromptBuilder
+            ._build_skills_block(skills)
+        )
+
+        rendered_context = (
+            PromptBuilder
+            ._build_context_block(task)
+        )
+
+        report_json = (
+            report.model_dump_json(indent=2)
+        )
+
+        return f"""{skills_block}
+
+# CONTESTO STRUTTURALE DEL PROGETTO
+
+{rendered_context}
+
+# DIFF ORIGINALE
+
+```diff
+{task.raw_input}
+```
+
+# REVIEW DA CORREGGERE
+
+{draft}
+
+# VALIDATION REPORT
+
+{report_json}
+
+# CORREZIONE
+
+Correggi la review del diff usando il validation report.
+
+REGOLE OBBLIGATORIE:
+- mantieni il FOCUS SUL DIFF: niente commenti sul codice non modificato
+- correggi SOLO i problemi segnalati dal validation report
+- mantieni il formato richiesto dalla skill diff_review:
+  - "## Sommario" sempre
+  - "## Modifiche rilevanti" sempre
+  - "## Rischi" se ci sono rischi reali
+  - "## Suggerimenti" se ci sono suggerimenti azionabili
+- calibra correttamente le severity (no inflation)
+- mantieni le parti del draft che il report non ha segnalato
+- non aggiungere prefazioni
+- non aggiungere spiegazioni meta su cosa hai corretto
+
+Restituisci SOLO la review finale corretta.
 """.strip()

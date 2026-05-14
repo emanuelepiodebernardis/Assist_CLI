@@ -259,3 +259,101 @@ def explain_command(
         output_format=output_format,
         output_path=output,
     )
+
+
+def test_command(
+    file: str,
+    output_format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            help="terminal | markdown | json",
+        ),
+    ] = "terminal",
+    output: Annotated[
+        str | None,
+        typer.Option(
+            "--output",
+            help="Save output to file",
+        ),
+    ] = None,
+) -> None:
+
+    validate_file_exists(file)
+
+    task = TaskInput(
+        command="test",
+        file_path=file,
+        language="python",
+        options={},
+    )
+
+    orchestrator = Orchestrator()
+
+    formatter = OutputFormatter()
+
+    result = orchestrator.run(
+        task
+    )
+
+    formatted_output = (
+        formatter.format(
+            result,
+            format_type=output_format,
+        )
+    )
+
+    _handle_output(
+        formatted_output=formatted_output,
+        output_format=output_format,
+        output_path=output,
+    )
+
+
+def diff_command(
+    range: str = typer.Argument(
+        "HEAD",
+        help="Git range to review (e.g. HEAD, HEAD~3, main..feature)",
+    ),
+    output_format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            help="terminal | markdown | json",
+        ),
+    ] = "terminal",
+    output: Annotated[
+        str | None,
+        typer.Option(
+            "--output",
+            help="Save output to file",
+        ),
+    ] = None,
+) -> None:
+
+    task = TaskInput(
+        command="diff",
+        git_range=range,
+        options={},
+    )
+
+    orchestrator = Orchestrator()
+
+    formatter = OutputFormatter()
+
+    result = orchestrator.run(
+        task
+    )
+
+    formatted_output = (
+        formatter.format(
+            result,
+            format_type=output_format,
+        )
+    )
+
+    _handle_output(
+        formatted_output=formatted_output,
+        output_format=output_format,
+        output_path=output,
+    )

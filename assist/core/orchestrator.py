@@ -1,9 +1,12 @@
 import ast
+from pathlib import Path
 
 from assist.agents.explainer import ExplainerAgent
 from assist.agents.generator import GeneratorAgent
 from assist.agents.refactor import RefactorAgent
 from assist.agents.reviewer import ReviewerAgent
+from assist.agents.test_generator import TestGeneratorAgent
+from assist.agents.diff_reviewer import DiffReviewerAgent
 
 from assist.core.assembler import ResponseAssembler
 from assist.core.context_guard import ContextGuard
@@ -48,6 +51,10 @@ from assist.core.code_quality_analyzer import (
     CodeQualityAnalyzer,
 )
 
+from assist.core.git_diff_extractor import (
+    GitDiffExtractor,
+)
+
 from assist.llm.factory import LLMFactory
 
 from assist.schemas.models import (
@@ -68,6 +75,8 @@ MAX_CORRECTIONS_PER_AGENT: dict[str, int] = {
     "GeneratorAgent": 2,
     "RefactorAgent": 2,
     "ExplainerAgent": 1,
+    "TestGeneratorAgent": 2,
+    "DiffReviewerAgent": 1,
 }
 
 
@@ -100,6 +109,8 @@ class Orchestrator:
             "ReviewerAgent": ReviewerAgent,
             "RefactorAgent": RefactorAgent,
             "ExplainerAgent": ExplainerAgent,
+            "TestGeneratorAgent": TestGeneratorAgent,
+            "DiffReviewerAgent": DiffReviewerAgent,
         }
 
         agent_class = agents[agent_name]
@@ -149,7 +160,38 @@ class Orchestrator:
 
         code_quality_context: dict = {}
 
-        if task.file_path:
+        impacted_files_content: dict = {}
+
+        if task.git_range:
+
+            extractor = GitDiffExtractor(
+                repo_path=Path(".")
+            )
+
+            git_diff = extractor.extract(
+                range_spec=task.git_range
+            )
+
+            file_content = git_diff.raw_diff
+
+            for file_diff in git_diff.files:
+
+                file_path_obj = Path(file_diff.path)
+
+                try:
+                    impacted_files_content[
+                        file_diff.path
+                    ] = file_path_obj.read_text(
+                        encoding="utf-8"
+                    )
+
+                except (
+                    FileNotFoundError,
+                    UnicodeDecodeError,
+                ):
+                    continue
+
+        elif task.file_path:
 
             raw_content = (
                 FileReader.read(
@@ -360,6 +402,10 @@ class Orchestrator:
                         "code_quality_context": (
                             code_quality_context
                         ),
+                        "impacted_files_content": (
+                            impacted_files_content
+                        ),
+                        "range_spec": task.git_range or "",
                     },
                 }
             )

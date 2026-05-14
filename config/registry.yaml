@@ -22,3 +22,17 @@ tasks:
     skills:
       - project_rules
       - documentation
+
+  test:
+    agent: TestGeneratorAgent
+    skills:
+      - project_rules
+      - pytest_generation
+      - python_generation
+
+  diff:
+    agent: DiffReviewerAgent
+    skills:
+      - project_rules
+      - code_review
+      - diff_review

@@ -1,14 +1,12 @@
 import typer
 
-from assist.schemas.models import TaskInput
-from assist.agents.reviewer import ReviewerAgent
-from assist.llm.mock_client import MockLLMClient
-
 from assist.cli.commands import (
     explain_command,
     generate_command,
     refactor_command,
     review_command,
+    test_command,
+    diff_command,
 )
 
 app = typer.Typer(
@@ -20,6 +18,8 @@ app.command(name="generate")(generate_command)
 app.command(name="review")(review_command)
 app.command(name="refactor")(refactor_command)
 app.command(name="explain")(explain_command)
+app.command(name="test")(test_command)
+app.command(name="diff")(diff_command)
 
 
 if __name__ == "__main__":
