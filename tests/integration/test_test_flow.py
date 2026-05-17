@@ -4,43 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from assist.core.architecture_analyzer import (
-    ArchitectureAnalyzer,
-)
-from assist.core.code_quality_analyzer import (
-    CodeQualityAnalyzer,
-)
 from assist.core.orchestrator import (
     Orchestrator,
-)
-from assist.core.project_graph import (
-    ProjectGraphBuilder,
-)
-from assist.core.project_scanner import (
-    ProjectScanner,
-)
-from assist.core.repository_context import (
-    RepositoryContextBuilder,
-)
-from assist.core.repository_health import (
-    RepositoryHealthAnalyzer,
-)
-from assist.core.semantic_analyzer import (
-    SemanticAnalyzer,
 )
 from assist.llm.factory import (
     LLMFactory,
 )
 from assist.schemas.models import (
-    ArchitectureReport,
-    CodeQualityReport,
-    FileMetadata,
     FinalOutput,
-    FunctionInfo,
-    ProjectFileNode,
-    ProjectGraph,
-    RepositoryHealthReport,
-    SemanticAnalysis,
 )
 
 
@@ -131,6 +102,7 @@ class SequencedMockLLM:
 def test_test_flow_end_to_end(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    patch_all_analyzers,
 ):
 
     target_file = (
@@ -161,116 +133,9 @@ def test_test_flow_end_to_end(
         lambda provider="anthropic": llm,
     )
 
-    monkeypatch.setattr(
-        ProjectScanner,
-        "scan",
-        lambda self, root: [
-            FileMetadata(
-                path=str(
-                    target_file
-                ),
-                size_bytes=target_file.stat().st_size,
-                lines=2,
-            )
-        ],
-    )
-
-    monkeypatch.setattr(
-        RepositoryContextBuilder,
-        "build",
-        lambda self,
+    patch_all_analyzers(
         target_file,
-        project_files: {
-            "related_files": [],
-            "project_size": len(
-                project_files
-            ),
-        },
-    )
-
-    monkeypatch.setattr(
-        ProjectGraphBuilder,
-        "build",
-        lambda self,
-        root: ProjectGraph(
-            root=str(root),
-            files=[
-                ProjectFileNode(
-                    path=str(
-                        target_file
-                    ),
-                    module="math_utils",
-                    imports=[],
-                    imported_by=[],
-                    size_bytes=target_file.stat().st_size,
-                    lines=2,
-                )
-            ],
-        ),
-    )
-
-    monkeypatch.setattr(
-        ArchitectureAnalyzer,
-        "detect_cycles",
-        lambda self,
-        graph: ArchitectureReport(
-            has_cycles=False,
-            cycles=[],
-            issues=[],
-        ),
-    )
-
-    monkeypatch.setattr(
-        RepositoryHealthAnalyzer,
-        "analyze",
-        lambda self,
-        graph,
-        cycles: RepositoryHealthReport(
-            total_files=len(
-                graph.files
-            ),
-            total_dependencies=0,
-            cyclic_dependencies=0,
-            highly_connected_files=[],
-            health_score=1.0,
-            issues=[],
-        ),
-    )
-
-    monkeypatch.setattr(
-        SemanticAnalyzer,
-        "analyze_file",
-        lambda self,
-        file_path: SemanticAnalysis(
-            path=file_path,
-            functions=[
-                FunctionInfo(
-                    name="add",
-                    line_count=2,
-                    complexity=1,
-                    lineno=1,
-                    end_lineno=2,
-                )
-            ],
-            classes=[],
-            imports=[],
-            calls=[],
-        ),
-    )
-
-    monkeypatch.setattr(
-        CodeQualityAnalyzer,
-        "analyze",
-        lambda self,
-        semantic,
-        graph,
-        tree=None: CodeQualityReport(
-            complexity_warnings=[],
-            dead_functions=[],
-            architectural_risks=[],
-            long_methods=[],
-            god_classes=[],
-        ),
+        module_name="math_utils",
     )
 
     orchestrator = (

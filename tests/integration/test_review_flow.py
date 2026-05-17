@@ -4,25 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from assist.core.architecture_analyzer import ArchitectureAnalyzer
-from assist.core.code_quality_analyzer import CodeQualityAnalyzer
 from assist.core.orchestrator import Orchestrator
-from assist.core.project_scanner import ProjectScanner
-from assist.core.project_graph import ProjectGraphBuilder
-from assist.core.repository_context import RepositoryContextBuilder
-from assist.core.repository_health import RepositoryHealthAnalyzer
-from assist.core.semantic_analyzer import SemanticAnalyzer
 from assist.llm.factory import LLMFactory
-from assist.schemas.models import (
-    ArchitectureReport,
-    CodeQualityReport,
-    FileMetadata,
-    FunctionInfo,
-    ProjectFileNode,
-    ProjectGraph,
-    RepositoryHealthReport,
-    SemanticAnalysis,
-)
 
 
 REVIEW_DRAFT_GENERIC = (
@@ -81,11 +64,22 @@ SELF_CHECK_VALID_JSON = (
 
 
 class SequencedMockLLM:
-    def __init__(self, responses: list[str]) -> None:
+
+    def __init__(
+        self,
+        responses: list[str],
+    ) -> None:
+
         self._responses = list(responses)
+
         self.prompts: list[str] = []
 
-    def complete(self, prompt: str, system: str = "") -> str:
+    def complete(
+        self,
+        prompt: str,
+        system: str = "",
+    ) -> str:
+
         self.prompts.append(prompt)
 
         if not self._responses:
@@ -100,6 +94,7 @@ class SequencedMockLLM:
 def test_review_flow_end_to_end(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    patch_all_analyzers,
 ):
 
     sample_file = tmp_path / "sample.py"
@@ -129,108 +124,12 @@ def test_review_flow_end_to_end(
         lambda provider="anthropic": llm,
     )
 
-    monkeypatch.setattr(
-        ProjectScanner,
-        "scan",
-        lambda self, root: [
-            FileMetadata(
-                path=str(sample_file),
-                size_bytes=sample_file.stat().st_size,
-                lines=len(
-                    sample_file
-                    .read_text(encoding="utf-8")
-                    .splitlines()
-                ),
-            )
-        ],
-    )
-
-    monkeypatch.setattr(
-        RepositoryContextBuilder,
-        "build",
-        lambda self, target_file, project_files: {
-            "related_files": [str(sample_file)],
-            "project_size": len(project_files),
-        },
-    )
-
-    monkeypatch.setattr(
-        ProjectGraphBuilder,
-        "build",
-        lambda self, root: ProjectGraph(
-            root=str(root),
-            files=[
-                ProjectFileNode(
-                    path=str(sample_file),
-                    module="sample",
-                    imports=[],
-                    imported_by=[],
-                    size_bytes=sample_file.stat().st_size,
-                    lines=len(
-                        sample_file
-                        .read_text(encoding="utf-8")
-                        .splitlines()
-                    ),
-                )
-            ],
-        ),
-    )
-
-    monkeypatch.setattr(
-        ArchitectureAnalyzer,
-        "detect_cycles",
-        lambda self, graph: ArchitectureReport(
-            has_cycles=False,
-            cycles=[],
-            issues=[],
-        ),
-    )
-
-    monkeypatch.setattr(
-        RepositoryHealthAnalyzer,
-        "analyze",
-        lambda self, graph, cycles: RepositoryHealthReport(
-            total_files=len(graph.files),
-            total_dependencies=0,
-            cyclic_dependencies=len(cycles),
-            highly_connected_files=[],
-            health_score=0.92,
-            issues=[],
-        ),
-    )
-
-    monkeypatch.setattr(
-        SemanticAnalyzer,
-        "analyze_file",
-        lambda self, file_path: SemanticAnalysis(
-            path=file_path,
-            functions=[
-                FunctionInfo(
-                    name="add",
-                    line_count=2,
-                    complexity=1,
-                    lineno=1,
-                    end_lineno=2,
-                )
-            ],
-            classes=[],
-            imports=[],
-            calls=["print"],
-        ),
-    )
-
-    monkeypatch.setattr(
-        CodeQualityAnalyzer,
-        "analyze",
-        lambda self, semantic, graph, tree=None: (
-            CodeQualityReport(
-                complexity_warnings=[],
-                dead_functions=[],
-                architectural_risks=[],
-                long_methods=[],
-                god_classes=[],
-            )
-        ),
+    patch_all_analyzers(
+        sample_file,
+        module_name="sample",
+        semantic_calls=["print"],
+        related_files=[str(sample_file)],
+        health_score=0.92,
     )
 
     orchestrator = Orchestrator()
