@@ -1,225 +1,372 @@
 ---
 name: python_generation
-version: 2.0
+version: 2.5
 applies_to: [generate]
+priority: 80
+inject_position: middle
+max_output_words: unlimited
 load_examples: true
 load_templates: true
-priority: high
-max_output_words:
-  concise: unlimited
-  verbose: unlimited
-conflict_resolution: >
-  In caso di conflitto con project_rules, project_rules ha sempre precedenza.
-  Regola specifica di questo file: funzioni max 40 righe (da project_rules).
-  Se un template supera 40 righe, estrailo in funzioni private.
+conflict_resolution: project_rules_wins
+_conflict_resolution_text: >
+  project_rules ha sempre precedenza sulle regole di questa skill.
+  Regola specifica di questa skill: il limite di 40 righe per funzione
+  (da project_rules) vale anche per i template e gli esempi prodotti
+  da questa skill. Se un template supera 40 righe, estrailo in funzioni
+  private.
+self_check_persona: adversarial
+_persona_text: >
+  Sei un senior engineer che deve approvare il codice prima del merge in
+  main. Il tuo default e' RIFIUTARE. La domanda che ti fai e': questo
+  codice e' eseguibile senza modifiche manuali, ed e' testabile senza
+  riscrittura? Se hai anche solo un dubbio, blocca. Il codice "che
+  funziona quasi" non passa: il chiamante non sa quale "quasi" sia il
+  suo caso.
 description: >
   Regole per la generazione di codice Python pulito, coerente e pronto
-  all'uso. Include struttura canonica, pattern preferiti, anti-pattern,
-  esempi di output atteso e checklist di self-verifica.
+  all'uso. Include struttura canonica (ordine import, signature, classi),
+  sei pattern preferiti con esempi, regole per la generazione da specifica,
+  esempio canonical completo, e checklist di self-verifica.
 ---
 
-════════════════════════════════════════════════════════════
-PYTHON GENERATION — REGOLE E STANDARD
-════════════════════════════════════════════════════════════
+# python_generation v2.5
 
-════════════════════════════════════════════════════════════
-SEZIONE 1 — OBIETTIVO
-════════════════════════════════════════════════════════════
+## 1. Scopo della skill
 
-Produci codice Python che:
-  1. Funziona correttamente al primo utilizzo
-  2. È leggibile da chi non lo ha scritto
-  3. È testabile senza modifiche (dipendenze iniettabili)
-  4. È estendibile senza riscritture
+Generare codice Python nuovo a partire da una specifica testuale o da
+una richiesta dell'utente. Il codice prodotto deve essere eseguibile al
+primo utilizzo, testabile senza modifiche, leggibile da chi non lo ha
+scritto, ed estendibile senza riscritture. Si distingue dal task
+`refactor` (che modifica codice esistente preservandone il comportamento)
+e dal task `review` (che analizza codice senza produrlo).
 
-Non generare "codice che potrebbe funzionare".
-Genera codice che funziona.
+## 2. Postura (come pensare al task)
 
-════════════════════════════════════════════════════════════
-SEZIONE 2 — STRUTTURA CANONICA
-════════════════════════════════════════════════════════════
+Stai producendo codice che entrerà in un repository, sarà letto da altri
+sviluppatori, sarà importato e chiamato da altro codice. Il tuo lavoro
+non è "scrivere qualcosa che il modello potrebbe accettare": è scrivere
+codice che un senior engineer approverebbe al merge.
 
-── ORDINE DEGLI IMPORT ───────────────────────────────────
+Il tuo default è: il codice è completo, funzionante, testabile. Se non
+è così, non lo restituisci. Una funzione con un TODO è un debito, non
+un output.
 
-  # 1. Standard library
-  from __future__ import annotations
-  import os
-  from pathlib import Path
-  from typing import Any, Literal, Optional
+Anticipa quattro tipi di violazioni ricorrenti del modello:
 
-  # 2. Third-party (riga vuota di separazione)
-  from pydantic import BaseModel, Field
+- **Codice "che potrebbe funzionare"**: signature corretta, corpo che
+  sembra giusto, ma con un bug evidente (off-by-one, ordine di
+  operazioni sbagliato, edge case non gestito). Verifica mentalmente
+  ogni branch prima di dichiarare il codice completo.
+- **Pseudocodice mascherato da Python**: funzioni con `pass`, `...`,
+  o `# implementare qui`. Se non sai come implementare una parte, non
+  produci la funzione: chiedi chiarimenti o solleva un'eccezione
+  esplicita con `NotImplementedError("messaggio chiaro")`.
+- **Dipendenze nascoste**: codice che usa `os.environ`, file system,
+  rete, ma non lo dichiara nella signature. Se la funzione legge un
+  file, il file path è un parametro. Se la classe usa un client HTTP,
+  il client è iniettato.
+- **Magic value**: numeri o stringhe letterali che rappresentano un
+  concetto (soglie, limiti, default). Tutti i magic value diventano
+  costanti `UPPER_SNAKE` di modulo.
 
-  # 3. Internal (riga vuota di separazione)
-  from assist.schemas.models import TaskInput
+Non generare "codice che potrebbe funzionare". Genera codice che
+funziona.
+
+## 3. Dati del context utilizzati
+
+### Reference (Layer 3, stabile tra run)
+- `project_rules` (sempre presente)
+- `python_generation` (questa skill)
+
+### Working artifacts (Layer 4, specifico al run)
+- `task.raw_input` — specifica testuale fornita dall'utente
+- `task.options.prompt` — eventuale prompt aggiuntivo passato da CLI
+- `task.file_path` — file target (può essere vuoto/inesistente se il
+  task è generazione ex novo)
+- `semantic_context` — se il file target esiste già, contiene le
+  funzioni e classi presenti (utile per coerenza di stile)
+- `repository_context.related_files` — file del progetto correlati
+  (segnale per allineare convenzioni di naming e organizzazione)
+- `cross_file_context.imports` — pattern di import del progetto
+  (segnale per scegliere import stile)
+
+### Opzionali (versioni future)
+- `project_conventions_context` — non ancora prodotto. Quando
+  disponibile, conterrà le convenzioni stilistiche specifiche del
+  progetto rilevate dall'analisi. Se assente: applica le convenzioni
+  canoniche della sezione 4.
+
+## 4. Regole operative
+
+### 4.1 Obiettivo del codice prodotto
+
+Il codice deve soddisfare quattro proprietà, in ordine di priorità:
+
+1. **Funziona correttamente al primo utilizzo**. Nessun bug evidente,
+   tutti gli edge case dichiarati nella specifica sono gestiti.
+2. **È leggibile da chi non lo ha scritto**. Nomi descrittivi,
+   struttura piatta, commenti che spiegano il "perché".
+3. **È testabile senza modifiche**. Dipendenze iniettate, side effect
+   isolati, nessun accesso diretto a risorse globali.
+4. **È estendibile senza riscritture**. Interfacce minimali, ABC dove
+   serve, separazione delle responsabilità.
+
+Se devi sacrificare una proprietà, sacrifica nell'ordine inverso:
+prima estendibilità, poi testabilità, poi leggibilità. Mai
+correttezza.
+
+### 4.2 Struttura canonica
+
+**Ordine degli import.** Tre gruppi separati da una riga vuota.
+
+```python
+# 1. Standard library
+from __future__ import annotations
+import os
+from pathlib import Path
+from typing import Any, Literal, Optional
+
+# 2. Third-party (riga vuota di separazione)
+from pydantic import BaseModel, Field
+
+# 3. Internal (riga vuota di separazione)
+from assist.schemas.models import TaskInput
+```
 
 Usa sempre import assoluti. Mai `from . import x` nei moduli
 principali (accettabile solo in `__init__.py`).
 
-── STRUTTURA DI UNA FUNZIONE ────────────────────────────
+**Struttura di una funzione.**
 
-  def nome_funzione(
-      param1: str,
-      param2: int,
-      param3: Optional[str] = None,
-  ) -> dict[str, Any]:
-      """Breve descrizione in una riga.
+```python
+def nome_funzione(
+    param1: str,
+    param2: int,
+    param3: Optional[str] = None,
+) -> dict[str, Any]:
+    """Breve descrizione in una riga.
 
-      Descrizione estesa solo se necessaria.
+    Descrizione estesa solo se necessaria.
 
-      Args:
-          param1: Descrizione. Non ripetere il tipo.
-          param2: Descrizione.
-          param3: Descrizione. Default None significa X.
+    Args:
+        param1: Descrizione. Non ripetere il tipo.
+        param2: Descrizione.
+        param3: Descrizione. Default None significa X.
 
-      Returns:
-          Descrizione del contenuto restituito.
+    Returns:
+        Descrizione del contenuto restituito.
 
-      Raises:
-          ValueError: Se param1 è vuoto.
+    Raises:
+        ValueError: Se param1 è vuoto.
 
-      Example:
-          >>> result = nome_funzione("test", 42)
-          >>> result["key"]
-          'value'
-      """
-      if not param1:
-          raise ValueError(f"param1 non può essere vuoto, ricevuto: {param1!r}")
+    Example:
+        >>> result = nome_funzione("test", 42)
+        >>> result["key"]
+        'value'
+    """
+    if not param1:
+        raise ValueError(f"param1 non può essere vuoto, ricevuto: {param1!r}")
 
-      result = _helper(param1, param2)
-      return result
+    result = _helper(param1, param2)
+    return result
+```
 
-── STRUTTURA DI UNA CLASSE ──────────────────────────────
+**Struttura di una classe.**
 
-  class NomeClasse:
-      """Breve descrizione della responsabilità della classe.
+```python
+class NomeClasse:
+    """Breve descrizione della responsabilità della classe.
 
-      Una classe ha una sola responsabilità.
+    Una classe ha una sola responsabilità.
 
-      Attributes:
-          attr1: Descrizione.
-          attr2: Descrizione.
-      """
+    Attributes:
+        attr1: Descrizione.
+        attr2: Descrizione.
+    """
 
-      def __init__(self, attr1: str, attr2: int = 0) -> None:
-          self.attr1 = attr1
-          self.attr2 = attr2
-          self._private: Optional[str] = None
+    def __init__(self, attr1: str, attr2: int = 0) -> None:
+        self.attr1 = attr1
+        self.attr2 = attr2
+        self._private: Optional[str] = None
 
-      def metodo_pubblico(self) -> str:
-          """Descrizione."""
-          return self._metodo_privato()
+    def metodo_pubblico(self) -> str:
+        """Descrizione."""
+        return self._metodo_privato()
 
-      def _metodo_privato(self) -> str:
-          return f"{self.attr1}:{self.attr2}"
+    def _metodo_privato(self) -> str:
+        return f"{self.attr1}:{self.attr2}"
+```
 
-════════════════════════════════════════════════════════════
-SEZIONE 3 — PATTERN PREFERITI: USALI SEMPRE
-════════════════════════════════════════════════════════════
+### 4.3 Sei pattern preferiti: usali sempre
 
-── FAIL FAST: valida l'input all'inizio ─────────────────
+**1. Fail fast: valida l'input all'inizio.**
 
-  CORRETTO:
-    def process(file_path: Path, max_lines: int) -> list[str]:
-        if not file_path.exists():
-            raise FileNotFoundError(f"File non trovato: {file_path}")
-        if max_lines <= 0:
-            raise ValueError(f"max_lines deve essere > 0, ricevuto: {max_lines}")
-        # logica principale dopo le guardie
+```python
+def process(file_path: Path, max_lines: int) -> list[str]:
+    if not file_path.exists():
+        raise FileNotFoundError(f"File non trovato: {file_path}")
+    if max_lines <= 0:
+        raise ValueError(f"max_lines deve essere > 0, ricevuto: {max_lines}")
+    # logica principale dopo le guardie
+```
 
-── PYDANTIC per strutture dati ──────────────────────────
+Le guardie all'inizio rendono il flusso principale lineare e
+permettono al lettore di assumere che gli input siano validi nel resto
+della funzione.
 
-  CORRETTO:
-    class Config(BaseModel):
-        model: str = Field(default="claude-3-5-sonnet-20241022")
-        temperature: float = Field(default=0.2, ge=0.0, le=1.0)
-        max_tokens: int = Field(default=4000, gt=0)
+**2. Pydantic per strutture dati.**
 
-  PROIBITO:
-    config = {"model": "...", "temperature": 0.2}   # dict non strutturato
+```python
+# CORRETTO
+class Config(BaseModel):
+    model: str = Field(default="claude-3-5-sonnet-20241022")
+    temperature: float = Field(default=0.2, ge=0.0, le=1.0)
+    max_tokens: int = Field(default=4000, gt=0)
 
-── PATHLIB invece di os.path ────────────────────────────
+# PROIBITO
+config = {"model": "...", "temperature": 0.2}   # dict non strutturato
+```
 
-  CORRETTO:
-    from pathlib import Path
-    content = Path("skills/project_rules/SKILL.md").read_text(encoding="utf-8")
+Pydantic dà validazione automatica, type hints completi, IDE
+autocomplete, serializzazione gratuita.
 
-  PROIBITO:
-    import os
-    path = os.path.join("skills", "project_rules", "SKILL.md")
+**3. Pathlib invece di os.path.**
 
-── CONTEXT MANAGER per risorse ──────────────────────────
+```python
+# CORRETTO
+from pathlib import Path
+content = Path("skills/project_rules/SKILL.md").read_text(encoding="utf-8")
 
-  CORRETTO:
-    with open(file_path, encoding="utf-8") as f:
-        content = f.read()
+# PROIBITO
+import os
+path = os.path.join("skills", "project_rules", "SKILL.md")
+```
 
-  PROIBITO:
-    f = open(file_path)
+`pathlib` è cross-platform per default, ha API metodica, supporta
+operatori (`/` per concatenare path).
+
+**4. Context manager per risorse.**
+
+```python
+# CORRETTO
+with open(file_path, encoding="utf-8") as f:
     content = f.read()
-    f.close()
 
-── ABC per interfacce sostituibili ──────────────────────
+# PROIBITO
+f = open(file_path)
+content = f.read()
+f.close()
+```
 
-  CORRETTO:
-    from abc import ABC, abstractmethod
+Il context manager garantisce la chiusura della risorsa anche su
+eccezione. Vale per file, connessioni, lock, transazioni.
 
-    class LLMClient(ABC):
-        @abstractmethod
-        def complete(self, prompt: str, system: str = "") -> str:
-            """Invia prompt al modello, restituisce la risposta."""
-            ...
+**5. ABC per interfacce sostituibili.**
 
-    class MockLLMClient(LLMClient):
-        def __init__(self, response: str) -> None:
-            self._response = response
+```python
+from abc import ABC, abstractmethod
 
-        def complete(self, prompt: str, system: str = "") -> str:
-            return self._response
+class LLMClient(ABC):
+    @abstractmethod
+    def complete(self, prompt: str, system: str = "") -> str:
+        """Invia prompt al modello, restituisce la risposta."""
+        ...
 
-── ECCEZIONE SPECIFICA con messaggio utile ───────────────
+class MockLLMClient(LLMClient):
+    def __init__(self, response: str) -> None:
+        self._response = response
 
-  CORRETTO:
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Output LLM non è JSON valido: {e}") from e
+    def complete(self, prompt: str, system: str = "") -> str:
+        return self._response
+```
 
-  PROIBITO:
-    try:
-        data = json.loads(raw)
-    except Exception:
-        data = {}
+ABC + dependency injection rende il codice testabile senza chiamate
+reali a servizi esterni.
 
-════════════════════════════════════════════════════════════
-SEZIONE 4 — GENERAZIONE DA SPECIFICA
-════════════════════════════════════════════════════════════
+**6. Eccezione specifica con messaggio utile.**
 
-Quando l'utente fornisce una specifica testuale o parziale:
+```python
+# CORRETTO
+try:
+    data = json.loads(raw)
+except json.JSONDecodeError as e:
+    raise ValueError(f"Output LLM non è JSON valido: {e}") from e
 
-  1. Identifica le entità: classi, funzioni, tipi
-  2. Identifica i contratti: input, output, eccezioni possibili
-  3. Genera nell'ordine: tipi → interfacce → implementazioni → helper
-  4. Non inferire comportamenti non specificati.
-     Se la specifica è ambigua, scegli il comportamento più
-     conservativo e commentalo:
+# PROIBITO
+try:
+    data = json.loads(raw)
+except Exception:
+    data = {}
+```
 
-       # NOTA: la specifica non indica il comportamento su input vuoto.
-       # Questa implementazione lancia ValueError. Modifica se necessario.
+Il `from e` preserva il traceback originale. Il messaggio nominale
+spiega cosa è andato storto. `except Exception` cattura tutto e
+nasconde i bug.
 
-  5. Include sempre un Example nel docstring se la firma non è
-     autoesplicativa.
+### 4.4 Generazione da specifica
 
-════════════════════════════════════════════════════════════
-SEZIONE 5 — ESEMPIO DI OUTPUT ATTESO
-════════════════════════════════════════════════════════════
+Quando l'utente fornisce una specifica testuale o parziale, segui
+questo processo:
 
-Di seguito un esempio completo di output accettabile per una
-richiesta di generazione. Calibra il tuo output su questo standard.
+1. **Identifica le entità**: classi, funzioni, tipi che la specifica
+   richiede.
+2. **Identifica i contratti**: per ogni entità, definisci input,
+   output, eccezioni possibili.
+3. **Genera nell'ordine**: tipi → interfacce → implementazioni →
+   helper. Mai partire dall'helper senza aver definito l'interfaccia.
+4. **Non inferire comportamenti non specificati**. Se la specifica è
+   ambigua, scegli il comportamento più conservativo (eccezione
+   esplicita piuttosto che fallback silenzioso) e commentalo:
 
-INPUT UTENTE: "Genera una funzione che carica una skill dal filesystem."
+```python
+# NOTA: la specifica non indica il comportamento su input vuoto.
+# Questa implementazione lancia ValueError. Modifica se necessario.
+```
 
-OUTPUT CORRETTO:
+5. **Include sempre un `Example`** nel docstring se la firma non è
+   autoesplicativa.
+
+## 5. Formato dell'output
+
+L'output è codice Python puro, pronto per essere salvato come file e
+importato. Vincoli stretti.
+
+**Per richieste di generazione di un singolo modulo o file:**
+
+```python
+[codice completo, eseguibile, senza placeholder]
+```
+
+Se necessarie dipendenze esterne non ovvie:
+
+```
+# Dipendenze: pip install pydantic typer
+```
+
+**Vietato:**
+
+- Prefazioni ("Ecco il codice richiesto:")
+- Postfazioni ("Spero ti sia utile!")
+- Commenti di sezione tipo `# === IMPORT ===`, `# --- LOGIC ---`
+- Pseudocodice o `# implementare qui`
+- Funzioni con solo `pass` non intenzionale
+- Placeholder di qualsiasi tipo (`<INSERIRE_QUI>`, `TODO`, `FIXME`)
+
+**Ammesso:**
+
+- Docstring del modulo all'inizio del file
+- Costanti `UPPER_SNAKE` di modulo dopo gli import
+- Funzioni helper private (`_nome`) dopo le funzioni pubbliche
+- Commenti inline solo dove il "perché" non è ovvio dal codice
+
+## 6. Esempi
+
+### Esempio canonical completo
+
+**Input utente**: "Genera una funzione che carica una skill dal
+filesystem."
+
+**Output corretto**:
 
 ```python
 from __future__ import annotations
@@ -325,28 +472,185 @@ def _validate_required_keys(metadata: dict[str, Any], source: Path) -> None:
         )
 ```
 
-Questo esempio mostra:
-  - Costante di modulo per il limite (no magic number)
-  - Fail fast con messaggi di errore utili
-  - Funzioni estratte (_parse_frontmatter, _validate_required_keys)
-  - Docstring Google style con Example eseguibile
-  - Type hints completi incluso il return type di _validate (-> None)
-  - from e for encadré: nessuna funzione supera 40 righe
+**Perché funziona**:
 
-════════════════════════════════════════════════════════════
-SEZIONE 6 — CHECKLIST SELF-VERIFICA PRIMA DI RESTITUIRE
-════════════════════════════════════════════════════════════
+- Costante di modulo `MAX_SKILL_SIZE_BYTES` (no magic number)
+- Fail fast con messaggi di errore utili e azionabili
+- Funzioni estratte: `_parse_frontmatter`, `_validate_required_keys`
+  (ognuna con singola responsabilità)
+- Docstring Google style con `Example` eseguibile
+- Type hints completi inclusi i return type privati (`-> None`)
+- Nessuna funzione supera 40 righe
+- Eccezioni specifiche con `from e` per preservare il traceback
+- Import nell'ordine corretto (stdlib → third-party)
 
-Esegui questa checklist mentalmente prima di restituire il codice.
-Se una voce è NO, correggi prima di procedere.
+### Esempio scorretto
 
-  [ ] Type hints su tutti i parametri e return type pubblici?
-  [ ] Type hint su tutti i return type privati?
-  [ ] Ogni funzione pubblica ha docstring con Args e Returns?
-  [ ] Nessun magic number senza costante nominata?
-  [ ] Nessun except Exception senza handling specifico?
-  [ ] Nessuna funzione supera 40 righe?
-  [ ] Import nell'ordine corretto (stdlib → third-party → internal)?
-  [ ] Nessun TODO, FIXME, placeholder, pass non intenzionale?
-  [ ] Il codice è eseguibile senza modifiche manuali?
-  [ ] Example nel docstring per funzioni con signature non ovvia?
+**Input utente**: "Genera una funzione che valida una password."
+
+**Output scorretto**:
+
+```python
+def validate_password(password):
+    # check length
+    if len(password) < 8:
+        return False
+    # check has number
+    has_number = False
+    for c in password:
+        if c.isdigit():
+            has_number = True
+    if not has_number:
+        return False
+    return True
+```
+
+**Perché è scorretto**:
+
+- Nessun type hint (`password` non è annotato, return type assente)
+- Nessuna docstring (la funzione e i criteri non sono documentati)
+- Magic number `8` senza costante nominata
+- Boolean return: il chiamante non sa perché ha fallito, solo
+  che è fallito
+- Commenti che ripetono il codice (`# check length`, `# check has
+  number`) senza aggiungere informazione
+
+**Output corretto** per lo stesso input:
+
+```python
+from __future__ import annotations
+
+
+MIN_PASSWORD_LENGTH: int = 8
+
+
+def validate_password(password: str) -> None:
+    """Verifica che password rispetti i criteri minimi di sicurezza.
+
+    Args:
+        password: Password da validare.
+
+    Raises:
+        ValueError: Se la password non rispetta uno dei criteri.
+                    Il messaggio identifica quale criterio ha fallito.
+
+    Example:
+        >>> validate_password("hunter22")  # passa
+        >>> validate_password("short1")    # raises ValueError
+    """
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise ValueError(
+            f"Password troppo corta: {len(password)} caratteri "
+            f"(minimo: {MIN_PASSWORD_LENGTH})."
+        )
+
+    if not any(c.isdigit() for c in password):
+        raise ValueError("Password deve contenere almeno una cifra.")
+```
+
+**Perché funziona**:
+
+- Type hints completi inclusi `-> None`
+- Docstring Google style con `Example`
+- Costante nominata `MIN_PASSWORD_LENGTH`
+- Eccezione esplicita per ogni criterio fallito (il chiamante sa
+  esattamente cosa correggere)
+- Comprehension `any(...)` invece di flag booleano + loop manuale
+- Nessun commento ridondante: il nome della funzione e i raise
+  documentano da soli
+
+## 7. Vincoli operativi assoluti
+
+- **Nessun placeholder nel codice**: `TODO`, `FIXME`, `...`, `pass`
+  non intenzionale, `# implementare qui`, `raise NotImplementedError`
+  senza messaggio chiaro. Se la funzione non può essere implementata,
+  non la includi nell'output.
+- **Type hints completi**: parametri pubblici tipizzati, return type
+  sempre annotato (incluso `-> None`).
+- **Nessuna funzione > 40 righe**: se la specifica richiede logica
+  più lunga, estrai funzioni private.
+- **Nessun magic number**: ogni letterale che rappresenta un concetto
+  (soglia, limite, default) è una costante `UPPER_SNAKE` di modulo.
+- **Nessuna dipendenza hardcoded**: client HTTP, LLM, database, file
+  system — tutto iniettato come parametro o attributo.
+- **Nessun `except` generico**: catturare `Exception` senza handling
+  specifico è proibito. Usa eccezioni specifiche con `from e` per
+  preservare il traceback.
+- **Nessuna chiamata di rete o I/O nascosta**: se la funzione fa I/O,
+  il path o il client sono parametri della signature.
+- **Codice eseguibile senza modifiche**: l'output può essere copiato
+  in un file `.py` e importato senza errori. Nessuna riga "da
+  completare manualmente".
+
+## 8. Self-check criteria
+
+Quando valuti la tua bozza di codice, applica questi criteri con
+default conservativo. In caso di dubbio su un criterio: non passa.
+
+- **Compilabilità**: il codice parsa senza syntax error? `python -c
+  "compile(open(file).read(), file, 'exec')"` non darebbe errori?
+- **Type hints**: tutti i parametri pubblici hanno type hint? Tutti
+  i return type sono annotati incluso `-> None`?
+- **Docstring**: ogni funzione e classe pubblica ha docstring Google
+  style con `Args` e `Returns`? Le eccezioni dichiarate corrispondono
+  a quelle effettivamente lanciate?
+- **Completezza**: nessun `TODO`, `FIXME`, `...`, `pass` non
+  intenzionale? Tutte le funzioni dichiarate sono implementate?
+- **Lunghezza**: nessuna funzione supera 40 righe (incluso docstring
+  e commenti)?
+- **Magic value**: nessun letterale numerico o stringa che rappresenti
+  un concetto (soglia, limite, default) è privo di costante nominata?
+- **Pattern preferiti applicati**: fail fast, pathlib, context manager,
+  eccezioni specifiche dove applicabile?
+- **Dipendenze iniettate**: tutte le dipendenze esterne (client,
+  database, LLM) sono parametri o attributi, non istanziate
+  internamente?
+- **Import ordinati**: tre gruppi (stdlib, third-party, internal)
+  separati da riga vuota?
+- **Example eseguibile**: se il docstring contiene `Example`, è
+  sintatticamente valido e produce l'output dichiarato?
+
+### Severity assignment
+
+- `critical`: il codice non parsa (syntax error); contiene
+  placeholder (`TODO`, `pass` non intenzionale, `...`); chiama API
+  inesistenti del progetto; ha bug evidenti sulla logica principale.
+- `high`: type hints mancanti su funzioni pubbliche; magic number
+  presenti; `except` generico; dipendenze hardcoded; funzione > 40
+  righe.
+- `medium`: docstring assente o incompleta su funzioni pubbliche;
+  `Example` mancante dove la firma non è autoesplicativa; nomi poco
+  descrittivi (es. `data`, `result`, `helper`).
+- `low`: ordine import subottimale; commenti inline ridondanti;
+  spaziatura non uniforme.
+
+## 9. Rubrica deterministica del quality_score
+
+Il quality_score finale è la media pesata di quattro criteri,
+ciascuno valutato da 0.0 a 1.0:
+
+- **Correttezza tecnica** (peso 0.35): il codice parsa, type hints
+  completi, no magic number, no `except` generico, no dipendenze
+  hardcoded, no placeholder. Questo è il criterio dominante: codice
+  che non funziona non passa, indipendentemente da quanto sia ben
+  documentato.
+- **Documentazione** (peso 0.25): docstring Google style su tutte le
+  funzioni e classi pubbliche, `Args` e `Returns` corretti, `Example`
+  presente dove la firma non è autoesplicativa, eccezioni dichiarate
+  corrispondono a quelle lanciate.
+- **Strutturazione** (peso 0.20): nessuna funzione > 40 righe, import
+  ordinati nei tre gruppi, pattern preferiti applicati (fail fast,
+  pathlib, context manager dove applicabile).
+- **Conformità formale dell'output** (peso 0.20): blocco `python`
+  ben formato, nessuna prefazione/postfazione, dipendenze esterne
+  dichiarate se non ovvie.
+
+Soglia di validità: `quality_score < 0.70` → `is_valid: false`,
+blocca l'output e avvia la rigenerazione.
+
+Nota: il peso 0.35 sulla correttezza tecnica riflette il fatto che è
+la regola più importante della skill. Codice ben documentato ma con
+bug evidenti, magic number, o placeholder, è peggio di codice scarno
+ma corretto. Il flusso di rigenerazione automatica del sistema
+(BaseAgent) si attiva su questi fallimenti, quindi pesano più degli
+altri.
