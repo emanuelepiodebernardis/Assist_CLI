@@ -36,3 +36,9 @@ tasks:
       - project_rules
       - code_review
       - diff_review
+
+  repo:
+    agent: RepoAgent
+    skills:
+      - project_rules
+      - repository_overview

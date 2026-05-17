@@ -13,6 +13,21 @@ def test_task_input_creation():
     assert task.command == "review"
     assert task.language == "python"
 
+def test_task_input_repo_path_optional():
+    task = TaskInput(
+        command="repo",
+        repo_path=".",
+    )
+
+    assert task.repo_path == "."
+    assert task.file_path is None
+    assert task.git_range is None
+
+
+def test_task_input_repo_path_default_none():
+    task = TaskInput(command="review", file_path="main.py")
+
+    assert task.repo_path is None
 
 def test_agent_output_quality_range():
     output = AgentOutput(

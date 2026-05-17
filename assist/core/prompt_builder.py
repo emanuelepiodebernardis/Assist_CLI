@@ -1034,20 +1034,6 @@ REGOLE OBBLIGATORIE:
 - il risultato deve essere sintatticamente valido
 - mantieni le parti del draft che il report non ha segnalato
 """.strip()
-    
-    # =====================================================================
-# Tre metodi da aggiungere a PromptBuilder in assist/core/prompt_builder.py
-#
-# Vanno aggiunti dopo build_test_correction_prompt, prima della chiusura
-# della classe PromptBuilder.
-#
-# Pattern: copia esatta della struttura di build_refactor_*, con queste
-# differenze chiave:
-# - usa task.options["impacted_files_content"] per il contenuto dei file
-# - usa task.raw_input come raw_diff (non come codice di un singolo file)
-# - usa task.options.get("range_spec") per riportare il range richiesto
-# =====================================================================
-
 
     @staticmethod
     def _build_impacted_files_block(
@@ -1292,4 +1278,224 @@ REGOLE OBBLIGATORIE:
 - non aggiungere spiegazioni meta su cosa hai corretto
 
 Restituisci SOLO la review finale corretta.
+""".strip()
+
+    @staticmethod
+    def build_repo_prompt(
+        task: TaskInput,
+        skills: list[Skill],
+    ) -> str:
+        """Costruisce il prompt per il task `repo`.
+
+        Diversamente dagli altri task, repo non ha task.raw_input
+        (non c'e' un singolo file da analizzare). Tutto il segnale
+        per l'overview deriva dal context strutturale aggregato a
+        livello di repository, popolato dall'orchestrator.
+
+        L'agente legge:
+        - task.repo_path: identifica il repository analizzato
+        - context aggregato: project_size, health_score, god_classes,
+          long_methods, complexity_warnings, risks, ecc.
+        """
+
+        skills_block = (
+            PromptBuilder
+            ._build_skills_block(skills)
+        )
+
+        rendered_context = (
+            PromptBuilder
+            ._build_context_block(task)
+        )
+
+        repo_path = (
+            task.repo_path
+            or "."
+        )
+
+        return f"""{skills_block}
+
+# CONTESTO STRUTTURALE DEL PROGETTO
+
+Le seguenti informazioni provengono da un'analisi statica
+deterministica dell'intero repository. Sono i dati aggregati
+a livello di progetto: dimensione, salute architetturale,
+rischi, hotspot di complessita.
+
+Ogni affermazione del tuo overview deve essere riconducibile
+a uno di questi dati. Non inventare pattern architetturali,
+non aggiungere giudizi morali sul codice, non riassumere file
+singoli.
+
+{rendered_context}
+
+# REPOSITORY ANALIZZATO
+
+Path: {repo_path}
+
+# ESEGUI ORA L'OVERVIEW
+
+Applica rigorosamente le regole definite nella skill repository_overview.
+
+VINCOLI ASSOLUTI:
+- ANCORAGGIO AI DATI: ogni affermazione di fatto deve poter essere
+  ricondotta a un campo specifico del context aggregato sopra
+- NO INVENZIONE DI PATTERN: non affermare che il progetto usa MVC,
+  Clean Architecture, microservizi o altri pattern architetturali
+  se non sono dimostrabili dai nomi delle directory o dai dati
+- NO GIUDIZI MORALI: niente "ben scritto", "scarsa qualita",
+  "scelta discutibile"
+- NO FILLER: niente "Continuate il buon lavoro", "Codice promettente"
+- NO RIASSUNTO DEL CODICE: l'overview e' sopra il codice, non
+  descrive cosa fanno classi o funzioni singole
+
+Produci l'output nel formato esatto definito dalla skill
+repository_overview:
+- "## Panoramica" sempre (max 200 parole)
+- "## Architettura" sempre (max 250 parole)
+- "## Salute del codice" sempre (max 350 parole)
+- "## Rischi architetturali" SOLO se ci sono rischi (max 300 parole)
+- "## Raccomandazioni" SOLO se ci sono raccomandazioni concrete
+  (max 250 parole, massimo 5 raccomandazioni)
+
+Non aggiungere prefazioni.
+""".strip()
+
+    @staticmethod
+    def build_repo_self_check_prompt(
+        draft: str,
+        task: TaskInput,
+        skills: list[Skill],
+    ) -> str:
+
+        skills_block = (
+            PromptBuilder
+            ._build_skills_block(skills)
+        )
+
+        rendered_context = (
+            PromptBuilder
+            ._build_context_block(task)
+        )
+
+        repo_path = (
+            task.repo_path
+            or "."
+        )
+
+        validation_schema = (
+            PromptBuilder
+            ._build_validation_json_schema()
+        )
+
+        return f"""{skills_block}
+
+# CONTESTO STRUTTURALE DEL PROGETTO
+
+{rendered_context}
+
+# REPOSITORY ANALIZZATO
+
+Path: {repo_path}
+
+# OVERVIEW DA VALIDARE
+
+{draft}
+
+# VALIDAZIONE
+
+Sei il reviewer finale dell'overview del repository.
+
+Il tuo default e' BLOCCARE. Cerca attivamente motivi
+per non approvare.
+
+Verifica in particolare:
+- ANCORAGGIO AI DATI: ogni affermazione di fatto e' riconducibile
+  a un campo del context aggregato? Affermazioni come "il progetto
+  e' ben strutturato" senza supporto da dati specifici sono violazioni
+- INVENZIONE DI PATTERN: l'overview afferma pattern architetturali
+  (MVC, Clean Architecture, microservizi, CQRS, hexagonal) senza
+  prova esplicita nei dati o nei nomi delle directory? Se si',
+  severity critical.
+- GIUDIZI MORALI: ci sono frasi tipo "ben scritto", "scarsa qualita",
+  "scelta discutibile"? Se si', severity high.
+- SEZIONI CONDIZIONALI: "## Rischi architetturali" e
+  "## Raccomandazioni" sono presenti SOLO se hanno contenuto reale?
+  Non vuote con disclaimer?
+- DENSITA: l'overview e' almeno 400 parole? Non c'e' filler?
+- CONCRETEZZA: le raccomandazioni sono azionabili? Citano i dati
+  che le motivano?
+- TONO: e' tecnico ma accessibile? I termini tecnici introdotti
+  sono spiegati la prima volta?
+- RIASSUNTO DEL CODICE: l'overview descrive cosa fanno classi o
+  funzioni singole invece di restare a livello di progetto?
+
+{validation_schema}
+""".strip()
+
+    @staticmethod
+    def build_repo_correction_prompt(
+        draft: str,
+        report: ValidationReport,
+        task: TaskInput,
+        skills: list[Skill],
+    ) -> str:
+
+        skills_block = (
+            PromptBuilder
+            ._build_skills_block(skills)
+        )
+
+        rendered_context = (
+            PromptBuilder
+            ._build_context_block(task)
+        )
+
+        report_json = (
+            report.model_dump_json(indent=2)
+        )
+
+        repo_path = (
+            task.repo_path
+            or "."
+        )
+
+        return f"""{skills_block}
+
+# CONTESTO STRUTTURALE DEL PROGETTO
+
+{rendered_context}
+
+# REPOSITORY ANALIZZATO
+
+Path: {repo_path}
+
+# OVERVIEW DA CORREGGERE
+
+{draft}
+
+# VALIDATION REPORT
+
+{report_json}
+
+# CORREZIONE
+
+Correggi l'overview usando il validation report.
+
+REGOLE OBBLIGATORIE:
+- mantieni l'ANCORAGGIO AI DATI: ogni affermazione deve essere
+  riconducibile al context
+- rimuovi pattern architetturali inventati non supportati dai dati
+- rimuovi giudizi morali e filler
+- mantieni il formato richiesto dalla skill repository_overview:
+  - "## Panoramica" sempre
+  - "## Architettura" sempre
+  - "## Salute del codice" sempre
+  - "## Rischi architetturali" SOLO se ci sono rischi reali
+  - "## Raccomandazioni" SOLO se ci sono raccomandazioni concrete
+- mantieni le parti del draft che il report non ha segnalato
+- non aggiungere prefazioni
+- non aggiungere spiegazioni meta su cosa hai corretto
+
+Restituisci SOLO l'overview finale corretto.
 """.strip()

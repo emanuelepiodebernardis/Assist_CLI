@@ -31,6 +31,7 @@ PROSE_TASKS: set[str] = {
     "review",
     "explain",
     "diff",
+    "repo",
 }
 
 
@@ -163,6 +164,7 @@ class OutputFormatter:
             "explain": "Explanation",
             "test": "Generated Tests",
             "diff": "Diff Review",
+            "repo": "Repository Overview",
         }
 
         return titles.get(

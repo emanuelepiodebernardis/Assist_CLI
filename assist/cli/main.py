@@ -7,6 +7,7 @@ from assist.cli.commands import (
     review_command,
     test_command,
     diff_command,
+    repo_command,
 )
 
 app = typer.Typer(
@@ -20,6 +21,7 @@ app.command(name="refactor")(refactor_command)
 app.command(name="explain")(explain_command)
 app.command(name="test")(test_command)
 app.command(name="diff")(diff_command)
+app.command(name="repo")(repo_command)
 
 
 if __name__ == "__main__":

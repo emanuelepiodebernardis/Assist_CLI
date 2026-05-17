@@ -25,7 +25,8 @@ class TaskInput(BaseModel):
     language: str = "python"
     raw_input: str | None = None
     options: dict = Field(default_factory=dict)
-    git_range: str | None = None 
+    git_range: str | None = None
+    repo_path: str | None = None
 
 
 class ValidationReport(BaseModel):

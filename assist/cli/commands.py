@@ -25,6 +25,23 @@ def validate_file_exists(
         )
 
 
+def validate_directory_exists(
+    dir_path: str,
+) -> None:
+
+    path = Path(dir_path)
+
+    if not path.exists():
+        raise typer.BadParameter(
+            f"Directory not found: {dir_path}"
+        )
+
+    if not path.is_dir():
+        raise typer.BadParameter(
+            f"Path is not a directory: {dir_path}"
+        )
+
+
 def _handle_output(
     formatted_output,
     output_format: str,
@@ -334,6 +351,57 @@ def diff_command(
     task = TaskInput(
         command="diff",
         git_range=range,
+        options={},
+    )
+
+    orchestrator = Orchestrator()
+
+    formatter = OutputFormatter()
+
+    result = orchestrator.run(
+        task
+    )
+
+    formatted_output = (
+        formatter.format(
+            result,
+            format_type=output_format,
+        )
+    )
+
+    _handle_output(
+        formatted_output=formatted_output,
+        output_format=output_format,
+        output_path=output,
+    )
+
+
+def repo_command(
+    path: str = typer.Argument(
+        ".",
+        help="Path to the repository to analyze (default: current directory)",
+    ),
+    output_format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            help="terminal | markdown | json",
+        ),
+    ] = "terminal",
+    output: Annotated[
+        str | None,
+        typer.Option(
+            "--output",
+            help="Save output to file",
+        ),
+    ] = None,
+) -> None:
+
+    validate_directory_exists(path)
+
+    task = TaskInput(
+        command="repo",
+        repo_path=path,
         options={},
     )
 
