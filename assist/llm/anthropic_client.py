@@ -17,7 +17,7 @@ class AnthropicClient(LLMClient):
         self,
         model: str = "claude-sonnet-4-6",
         temperature: float = 0.2,
-        max_tokens: int = 1024,
+        max_tokens: int = 8000,
         api_key: str | None = None,
     ) -> None:
 
