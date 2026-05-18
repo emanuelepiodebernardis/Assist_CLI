@@ -1,6 +1,6 @@
----
+﻿---
 name: code_review
-version: 2.5
+version: 3.0
 applies_to: [review]
 priority: 80
 inject_position: middle
@@ -22,9 +22,38 @@ description: >
   Regole per la review di codice Python. Include scala di severita' calibrata,
   ordine di analisi fisso, persona avversariale per il self-check, formato
   strutturato verificato automaticamente, esempi di review corretta e scorretta.
+
+# === Campi v3.0 (Runtime Configuration) ===
+
+task_type: prose
+
+inputs:
+  required:
+    - raw_input
+  optional:
+    - options
+
+outputs:
+  format: markdown
+  sections:
+    required:
+      - "## Sommario"
+      - "## Problemi critici"
+      - "## Problemi significativi"
+    optional:
+      - "## Suggerimenti"
+
+process:
+  max_corrections: 1
+  quality_threshold: 0.70
+
+verifier:
+  syntax: noop
+  format: section_headers
+  coherence: rubric
 ---
 
-# code_review v2.5
+# code_review v3.0
 
 ## 1. Scopo della skill
 
