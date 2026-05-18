@@ -1,4 +1,4 @@
-# Assist CLI
+﻿# Assist CLI
 
 A modular command-line coding assistant for Python that combines deterministic
 static analysis with LLM agents under declarative skill constraints.
