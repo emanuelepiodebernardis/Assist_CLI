@@ -1,4 +1,4 @@
-﻿---
+---
 name: code_review
 version: 3.0
 applies_to: [review]
